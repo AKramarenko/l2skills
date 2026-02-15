@@ -515,7 +515,7 @@ function recalculate() {
         const tipReg = [
             `Giant's Codex (обычная) +${i} → +${i+1}`,
             ``,
-            `Попытка: ${i===0 ? 'книга '+fmtNum(codexPrice)+' + адена NPC '+fmtNum(adena)+' = '+fmtNum(cReg) : 'адена NPC '+fmtNum(adena)}`,
+            `Попытка: ${i===0 ? 'книга '+fmtNum(codexPrice)+' + адена за попытку '+fmtNum(adena)+' = '+fmtNum(cReg) : 'адена за попытку '+fmtNum(adena)}`,
             `Шанс: ${chance}%`,
             ``,
             `Ср. стоимость попыток: ${fmtNum(cReg)} / ${(p).toFixed(2)} = ${fmtNum(cReg/p)}`,
@@ -528,7 +528,7 @@ function recalculate() {
         const tipMas = [
             `Giant's Codex - Mastery +${i} → +${i+1}`,
             ``,
-            `Попытка: книга ${fmtNum(masteryPrice)} + адена NPC ${fmtNum(adenaMas)} = ${fmtNum(cMas)}`,
+            `Попытка: книга ${fmtNum(masteryPrice)} + адена за попытку ${fmtNum(adenaMas)} = ${fmtNum(cMas)}`,
             `  (адена: ${fmtNum(adena)} × 5 = ${fmtNum(adenaMas)})`,
             `Шанс: ${chance}%`,
             ``,

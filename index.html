@@ -188,7 +188,36 @@
             <span class="hint">Расходуется на каждую попытку</span>
         </div>
     </div>
-    <button class="btn" id="recalc">Пересчитать</button>
+</div>
+
+<!-- Оптимальная стратегия -->
+<div class="panel">
+    <h2>Оптимальная стратегия заточки</h2>
+    <div id="costInfo"></div>
+    <div id="switchPoint"></div>
+    <p style="font-size:0.82em;color:var(--text-dim);margin-bottom:6px;">
+        Для каждого уровня показано, что выгоднее: обычная или мастери книга.<br>
+        Предыдущие уровни считаются заточенными оптимально (дешёвым способом).
+    </p>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot regular"></div> Обычная</div>
+        <div class="legend-item"><div class="legend-dot master"></div> Мастери</div>
+    </div>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ур.</th>
+                    <th>Шанс</th>
+                    <th>Стоимость шага<br><span style="font-weight:400;font-size:0.85em">обычная</span></th>
+                    <th>Стоимость шага<br><span style="font-weight:400;font-size:0.85em">мастери</span></th>
+                    <th>Использовать</th>
+                    <th>Итого до +N<br><span style="font-weight:400;font-size:0.85em">оптимально</span></th>
+                </tr>
+            </thead>
+            <tbody id="costBody"></tbody>
+        </table>
+    </div>
 </div>
 
 <!-- Справочная таблица шансов -->
@@ -227,36 +256,6 @@
     </div>
 </div>
 
-<!-- Оптимальная стратегия -->
-<div class="panel">
-    <h2>Оптимальная стратегия заточки</h2>
-    <div id="costInfo"></div>
-    <div id="switchPoint"></div>
-    <p style="font-size:0.82em;color:var(--text-dim);margin-bottom:6px;">
-        Для каждого уровня показано, что выгоднее: обычная или мастери книга.<br>
-        Предыдущие уровни считаются заточенными оптимально (дешёвым способом).
-    </p>
-    <div class="legend">
-        <div class="legend-item"><div class="legend-dot regular"></div> Обычная</div>
-        <div class="legend-item"><div class="legend-dot master"></div> Мастери</div>
-    </div>
-    <div class="table-scroll">
-        <table>
-            <thead>
-                <tr>
-                    <th>Ур.</th>
-                    <th>Шанс</th>
-                    <th>Стоимость шага<br><span style="font-weight:400;font-size:0.85em">обычная</span></th>
-                    <th>Стоимость шага<br><span style="font-weight:400;font-size:0.85em">мастери</span></th>
-                    <th>Использовать</th>
-                    <th>Итого до +N<br><span style="font-weight:400;font-size:0.85em">оптимально</span></th>
-                </tr>
-            </thead>
-            <tbody id="costBody"></tbody>
-        </table>
-    </div>
-</div>
-
 <!-- Формулы -->
 <div class="panel">
     <h2>Формулы расчёта</h2>
@@ -283,9 +282,6 @@
         <code>C_обычн(1) = codex + адена(1)</code>, <code>C_обычн(n&gt;1) = адена(n)</code><br>
         <code>C_мастери(n) = mastery + адена(n)</code>
     </div>
-    <p class="source-note">
-        Данные: <a href="https://github.com/danielbarion/HighFive" target="_blank">L2J High Five — EnchantSkillGroups.xml</a>
-    </p>
 </div>
 
 <script>
@@ -579,16 +575,40 @@ function updateAll() {
     recalculate();
 }
 
+// ======= localStorage =======
+const LS_KEY = 'l2skills_settings';
+function saveSettings() {
+    const data = {
+        charLevel: document.getElementById('charLevel').value,
+        skillGroup: document.getElementById('skillGroup').value,
+        priceCodex: document.getElementById('priceCodex').value,
+        priceMastery: document.getElementById('priceMastery').value,
+    };
+    try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
+}
+function loadSettings() {
+    try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data.charLevel) document.getElementById('charLevel').value = data.charLevel;
+        if (data.skillGroup) document.getElementById('skillGroup').value = data.skillGroup;
+        if (data.priceCodex) document.getElementById('priceCodex').value = data.priceCodex;
+        if (data.priceMastery) document.getElementById('priceMastery').value = data.priceMastery;
+    } catch(e) {}
+}
+
 // ======= Event listeners =======
-document.getElementById('charLevel').addEventListener('change', updateAll);
-document.getElementById('skillGroup').addEventListener('change', updateAll);
-document.getElementById('recalc').addEventListener('click', updateAll);
+document.getElementById('charLevel').addEventListener('change', () => { updateAll(); saveSettings(); });
+document.getElementById('skillGroup').addEventListener('change', () => { updateAll(); saveSettings(); });
 document.querySelectorAll('#priceCodex, #priceMastery').forEach(inp => {
-    inp.addEventListener('blur', () => autoFormat(inp));
+    inp.addEventListener('input', () => { updateAll(); });
+    inp.addEventListener('blur', () => { autoFormat(inp); saveSettings(); });
 });
-document.addEventListener('keydown', e => { if (e.key==='Enter') updateAll(); });
+document.addEventListener('keydown', e => { if (e.key==='Enter') { updateAll(); saveSettings(); } });
 
 // Init
+loadSettings();
 updateAll();
 </script>
 </body>

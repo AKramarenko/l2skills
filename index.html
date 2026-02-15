@@ -513,34 +513,38 @@ function recalculate() {
 
         // Тултипы с формулой
         const tipReg = [
-            `Стоимость шага +${i} → +${i+1} обычной:`,
-            `S = C/p + E_opt(+${i}) · (1−p) / p`,
-            `= ${fmtNum(cReg)} / ${(p).toFixed(2)} + ${fmtNum(prevEOpt)} · ${(1-p).toFixed(2)} / ${(p).toFixed(2)}`,
-            `= ${fmtNum(cReg/p)} + ${fmtNum(prevEOpt*(1-p)/p)}`,
-            `= ${fmtNum(stepReg)}`,
+            `Giant's Codex (обычная) +${i} → +${i+1}`,
             ``,
-            i===0 ? `C = codex ${fmtNum(codexPrice)} + адена ${fmtNum(adena)}` : `C = адена ${fmtNum(adena)}`,
-            `«Цена риска» = ${fmtNum(prevEOpt*(1-p)/p)} (стоимость потери прогресса при фейле)`,
+            `Попытка: ${i===0 ? 'книга '+fmtNum(codexPrice)+' + адена NPC '+fmtNum(adena)+' = '+fmtNum(cReg) : 'адена NPC '+fmtNum(adena)}`,
+            `Шанс: ${chance}%`,
+            ``,
+            `Ср. стоимость попыток: ${fmtNum(cReg)} / ${(p).toFixed(2)} = ${fmtNum(cReg/p)}`,
+            `Цена риска (сброс в 0): ${fmtNum(prevEOpt)} × ${(1-p).toFixed(2)} / ${(p).toFixed(2)} = ${fmtNum(prevEOpt*(1-p)/p)}`,
+            `  (при фейле теряем всё вложенное: ${fmtNum(prevEOpt)})`,
+            ``,
+            `Итого шаг: ${fmtNum(cReg/p)} + ${fmtNum(prevEOpt*(1-p)/p)} = ${fmtNum(stepReg)}`,
         ].join('\n');
 
         const tipMas = [
-            `Стоимость шага +${i} → +${i+1} мастери:`,
-            `S = C_m / p`,
-            `= ${fmtNum(cMas)} / ${(p).toFixed(2)}`,
-            `= ${fmtNum(stepMas)}`,
+            `Giant's Codex - Mastery +${i} → +${i+1}`,
             ``,
-            `C_m = mastery ${fmtNum(masteryPrice)} + адена×5 ${fmtNum(adenaMas)}`,
-            `(адена обычн. ${fmtNum(adena)} × 5 = ${fmtNum(adenaMas)})`,
-            `Без риска: при фейле уровень не падает.`,
+            `Попытка: книга ${fmtNum(masteryPrice)} + адена NPC ${fmtNum(adenaMas)} = ${fmtNum(cMas)}`,
+            `  (адена: ${fmtNum(adena)} × 5 = ${fmtNum(adenaMas)})`,
+            `Шанс: ${chance}%`,
+            ``,
+            `Ср. стоимость попыток: ${fmtNum(cMas)} / ${(p).toFixed(2)} = ${fmtNum(stepMas)}`,
+            `При фейле уровень не падает — риска потери нет.`,
         ].join('\n');
 
         const tipOpt = [
-            `E_opt(+${i+1}) = E_opt(+${i}) + min(S_обычн, S_мастери)`,
-            `= ${fmtNum(prevEOpt)} + min(${fmtNum(stepReg)}, ${fmtNum(stepMas)})`,
-            `= ${fmtNum(prevEOpt)} + ${fmtNum(stepOpt)}`,
-            `= ${fmtNum(eOpt)}`,
+            `Оптимальная стоимость 0 → +${i+1}`,
             ``,
-            `Выбрано: ${useReg ? 'ОБЫЧНАЯ (дешевле на '+fmtNum(stepMas-stepReg)+')' : 'МАСТЕРИ (дешевле на '+fmtNum(stepReg-stepMas)+')'}`,
+            `Уже вложено (0 → +${i}): ${fmtNum(prevEOpt)}`,
+            `Шаг Giant's Codex: ${fmtNum(stepReg)}`,
+            `Шаг Mastery: ${fmtNum(stepMas)}`,
+            `Выгоднее: ${useReg ? 'Giant\'s Codex (экономия '+fmtNum(stepMas-stepReg)+')' : 'Mastery (экономия '+fmtNum(stepReg-stepMas)+')'}`,
+            ``,
+            `Итого: ${fmtNum(prevEOpt)} + ${fmtNum(stepOpt)} = ${fmtNum(eOpt)}`,
         ].join('\n');
 
         const tr = document.createElement('tr');

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L2 — Калькулятор проточки скиллов</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --surface2: #0f3460;
+            --text: #eee;
+            --text-dim: #aab;
+            --green: #4ecca3;
+            --red: #e94560;
+            --gold: #f0c040;
+            --blue: #64b5f6;
+            --border: #2a2a4a;
+            --highlight: rgba(240, 192, 64, 0.12);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 { text-align: center; font-size: 1.8em; margin-bottom: 6px; color: var(--gold); }
+        .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 24px; font-size: 0.9em; }
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .panel h2 {
+            font-size: 1.15em;
+            margin-bottom: 14px;
+            color: var(--gold);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+        @media (max-width: 780px) { .settings-grid { grid-template-columns: 1fr; } }
+        .field { display: flex; flex-direction: column; gap: 4px; }
+        .field label { font-size: 0.85em; color: var(--text-dim); }
+        .field input, .field select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            padding: 8px 12px;
+            font-size: 1em;
+            width: 100%;
+        }
+        .field input:focus, .field select:focus { outline: none; border-color: var(--gold); }
+        .field select {
+            cursor: pointer; appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23aab' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+        }
+        .field select option { background: var(--bg); color: var(--text); }
+        .hint { font-size: 0.75em; color: var(--text-dim); }
+        button.btn {
+            display: block; margin: 18px auto 0;
+            background: var(--red); color: #fff; border: none;
+            border-radius: 8px; padding: 10px 40px;
+            font-size: 1em; font-weight: 600; cursor: pointer;
+        }
+        button.btn:hover { background: #c33a52; }
+        button.btn:active { transform: scale(0.97); }
+        .table-scroll { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        th {
+            background: var(--surface2); color: var(--gold);
+            padding: 7px 8px; text-align: center;
+            font-weight: 600; white-space: nowrap;
+            position: sticky; top: 0; z-index: 2;
+        }
+        td {
+            padding: 5px 8px; text-align: center;
+            border-bottom: 1px solid var(--border); white-space: nowrap;
+        }
+        tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+        tr:hover td { background: rgba(255,255,255,0.06); }
+        .col-highlight { background: var(--highlight) !important; font-weight: 700; color: var(--gold); }
+        th.col-highlight { background: rgba(240, 192, 64, 0.3) !important; box-shadow: inset 0 -2px 0 var(--gold); }
+        .col-dim { color: var(--text-dim); }
+        .magic-lvl { color: var(--text-dim); font-size: 0.85em; }
+        .cost-regular { color: var(--green); }
+        .cost-master { color: var(--blue); }
+        .winner-cell { font-weight: 700; font-size: 0.8em; }
+        .winner-regular { color: var(--green); }
+        .winner-master { color: var(--blue); }
+        .winner-equal { color: var(--text-dim); }
+        .savings-positive { color: var(--green); }
+        .savings-negative { color: var(--red); }
+        .has-tip { cursor: help; border-bottom: 1px dashed rgba(255,255,255,0.25); }
+        .chance-low { color: var(--red); }
+        .chance-mid { color: #f0c040; }
+        .chance-high { color: var(--green); }
+        .legend { display: flex; gap: 20px; justify-content: center; margin-bottom: 12px; font-size: 0.85em; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .legend-dot.regular { background: var(--green); }
+        .legend-dot.master { background: var(--blue); }
+        .info-badge {
+            display: inline-block; background: var(--surface2);
+            border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 14px; font-size: 0.85em; margin-bottom: 10px;
+        }
+        .info-badge strong { color: var(--gold); }
+        .formula-block {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; padding: 12px 16px; margin-top: 12px;
+            font-size: 0.82em; color: var(--text-dim); line-height: 1.6;
+        }
+        .formula-block code { color: var(--gold); font-family: 'Consolas', monospace; }
+        .source-note { text-align: center; font-size: 0.75em; color: var(--text-dim); margin-top: 16px; }
+        .source-note a { color: var(--blue); }
+        .dim { color: var(--text-dim); font-size: 0.85em; }
+        .switch-banner {
+            background: linear-gradient(135deg, var(--surface2), rgba(240,192,64,0.15));
+            border: 1px solid var(--gold);
+            border-radius: 8px;
+            padding: 12px 18px;
+            margin-bottom: 12px;
+            font-size: 0.95em;
+        }
+        .switch-banner strong { color: var(--gold); }
+        tr.switch-row td {
+            border-top: 2px solid var(--gold) !important;
+            background: rgba(240,192,64,0.08) !important;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Калькулятор проточки скиллов</h1>
+<p class="subtitle">Сравнение стоимости заточки обычными и мастери книгами (High Five)</p>
+
+<!-- Настройки -->
+<div class="panel">
+    <h2>Настройки</h2>
+    <div class="settings-grid">
+        <div class="field">
+            <label>Уровень персонажа</label>
+            <select id="charLevel">
+                <option value="76">76</option>
+                <option value="77">77</option>
+                <option value="78">78</option>
+                <option value="79">79</option>
+                <option value="80">80</option>
+                <option value="81">81</option>
+                <option value="82">82</option>
+                <option value="83">83</option>
+                <option value="84">84</option>
+                <option value="85" selected>85</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Тип умения</label>
+            <select id="skillGroup">
+                <option value="g1" selected>2-я профа: баффы / дебаффы / тоглы / самоны</option>
+                <option value="g2">2-я профа: атакующие / кубики</option>
+                <option value="g5">3-я профа (все типы)</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Giant's Codex — обычная книга (адена)</label>
+            <input type="text" id="priceCodex" value="9 000 000" inputmode="numeric">
+            <span class="hint">Используется 1 раз при заточке 0 → +1</span>
+        </div>
+        <div class="field">
+            <label>Giant's Codex - Mastery (адена)</label>
+            <input type="text" id="priceMastery" value="55 000 000" inputmode="numeric">
+            <span class="hint">Расходуется на каждую попытку</span>
+        </div>
+    </div>
+    <button class="btn" id="recalc">Пересчитать</button>
+</div>
+
+<!-- Справочная таблица шансов -->
+<div class="panel">
+    <h2>Таблица шансов заточки</h2>
+    <div id="chanceInfo"></div>
+    <p style="font-size:0.82em;color:var(--text-dim);margin-bottom:10px;">
+        Данные L2J High Five. Выделен столбец для выбранного уровня персонажа.
+    </p>
+    <div class="table-scroll">
+        <table><thead><tr id="refHead"></tr></thead><tbody id="refBody"></tbody></table>
+    </div>
+</div>
+
+<!-- Стоимость попытки -->
+<div class="panel">
+    <h2>Стоимость одной попытки заточки</h2>
+    <div id="attemptInfo"></div>
+    <p style="font-size:0.82em;color:var(--text-dim);margin-bottom:10px;">
+        Адена и SP из игровых данных (L2J High Five). Codex/Mastery книга — из настроек выше.
+    </p>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ур.</th>
+                    <th>Адена (NPC)</th>
+                    <th>SP</th>
+                    <th>Итого: обычная попытка</th>
+                    <th>Итого: мастери попытка</th>
+                </tr>
+            </thead>
+            <tbody id="attemptBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Оптимальная стратегия -->
+<div class="panel">
+    <h2>Оптимальная стратегия заточки</h2>
+    <div id="costInfo"></div>
+    <div id="switchPoint"></div>
+    <p style="font-size:0.82em;color:var(--text-dim);margin-bottom:6px;">
+        Для каждого уровня показано, что выгоднее: обычная или мастери книга.<br>
+        Предыдущие уровни считаются заточенными оптимально (дешёвым способом).
+    </p>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot regular"></div> Обычная</div>
+        <div class="legend-item"><div class="legend-dot master"></div> Мастери</div>
+    </div>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ур.</th>
+                    <th>Шанс</th>
+                    <th>Стоимость шага<br><span style="font-weight:400;font-size:0.85em">обычная</span></th>
+                    <th>Стоимость шага<br><span style="font-weight:400;font-size:0.85em">мастери</span></th>
+                    <th>Использовать</th>
+                    <th>Итого до +N<br><span style="font-weight:400;font-size:0.85em">оптимально</span></th>
+                </tr>
+            </thead>
+            <tbody id="costBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Формулы -->
+<div class="panel">
+    <h2>Формулы расчёта</h2>
+    <div class="formula-block">
+        <strong>Задача:</strong> для каждого уровня +n определить, выгоднее использовать обычную или мастери книгу,
+        учитывая что все предыдущие уровни заточены оптимально (стоимость = <code>E_opt(n-1)</code>).<br><br>
+
+        <strong>Стоимость шага обычной книгой</strong> (фейл → сброс в 0, нужно заново):<br>
+        <code>S_обычн(n) = (E_opt(n-1) + C_обычн(n)) / p(n) − E_opt(n-1)</code><br>
+        <code>= C_обычн(n) / p(n) + E_opt(n-1) · (1 − p(n)) / p(n)</code><br>
+        Включает «цену риска»: чем дороже уже вложено, тем больнее потерять.<br><br>
+
+        <strong>Стоимость шага мастери книгой</strong> (фейл → уровень не падает):<br>
+        <code>S_мастери(n) = C_мастери(n) / p(n)</code><br>
+        Не зависит от предыдущих вложений — риска потери нет.<br><br>
+
+        <strong>Оптимальный выбор:</strong><br>
+        <code>E_opt(n) = E_opt(n-1) + min(S_обычн(n), S_мастери(n))</code><br><br>
+
+        <strong>Точка переключения:</strong> обычная выгоднее пока <code>E_opt(n-1)</code> невелика.<br>
+        Как только накопленная стоимость делает «цену риска» слишком высокой — мастери выгоднее.<br><br>
+
+        <strong>Стоимость попытки:</strong><br>
+        <code>C_обычн(1) = codex + адена(1)</code>, <code>C_обычн(n&gt;1) = адена(n)</code><br>
+        <code>C_мастери(n) = mastery + адена(n)</code>
+    </div>
+    <p class="source-note">
+        Данные: <a href="https://github.com/danielbarion/HighFive" target="_blank">L2J High Five — EnchantSkillGroups.xml</a>
+    </p>
+</div>
+
+<script>
+// ======= Данные из L2J High Five EnchantSkillGroups.xml =======
+// Шансы: [chance76, chance77, ..., chance85]
+// Стоимость: [adena, sp]
+
+const CHAR_LEVELS = [76,77,78,79,80,81,82,83,84,85];
+
+// Шансы одинаковы для всех групп внутри одной профессии
+const CHANCES_PROF2 = [
+    [82,92,97,97,97,97,97,97,97,97],
+    [80,90,95,95,95,95,95,95,95,95],
+    [78,88,93,93,93,93,93,93,93,93],
+    [52,76,86,91,91,91,91,91,91,91],
+    [50,74,84,89,89,89,89,89,89,89],
+    [48,72,82,87,87,87,87,87,87,87],
+    [36,46,70,80,85,85,85,85,85,85],
+    [34,44,68,78,83,83,83,83,83,83],
+    [32,42,66,76,81,81,81,81,81,81],
+    [20,30,40,64,74,79,79,79,79,79],
+    [18,28,38,62,72,77,77,77,77,77],
+    [16,26,36,60,70,75,75,75,75,75],
+    [4,14,24,34,58,68,73,73,73,73],
+    [2,12,22,32,56,66,71,71,71,71],
+    [1,10,20,30,54,64,69,69,69,69],
+    [1,1,8,18,28,52,62,67,67,67],
+    [1,1,6,16,26,50,60,65,65,65],
+    [1,1,4,14,24,48,58,63,63,63],
+    [1,1,1,2,12,22,46,56,61,61],
+    [1,1,1,1,10,20,44,54,59,59],
+    [1,1,1,1,8,18,42,52,57,57],
+    [1,1,1,1,1,6,16,40,50,55],
+    [1,1,1,1,1,4,14,38,48,53],
+    [1,1,1,1,1,2,12,36,46,46],
+    [1,1,1,1,1,1,1,10,34,44],
+    [1,1,1,1,1,1,1,8,32,42],
+    [1,1,1,1,1,1,1,6,30,40],
+    [1,1,1,1,1,1,1,1,4,28],
+    [1,1,1,1,1,1,1,1,2,26],
+    [1,1,1,1,1,1,1,1,1,24],
+];
+
+const CHANCES_PROF3 = [
+    [18,28,38,48,58,82,92,97,97,97],
+    [16,26,36,46,56,80,90,95,95,95],
+    [14,24,34,44,54,78,88,93,93,93],
+    [2,12,22,32,42,52,76,86,91,91],
+    [1,10,20,30,40,50,74,84,89,89],
+    [1,8,18,28,38,48,72,82,87,87],
+    [1,1,6,16,26,36,46,70,80,85],
+    [1,1,4,14,24,34,44,68,78,83],
+    [1,1,2,12,22,32,42,66,76,81],
+    [1,1,1,1,10,20,30,40,64,74],
+    [1,1,1,1,8,18,28,38,62,72],
+    [1,1,1,1,6,16,26,36,60,70],
+    [1,1,1,1,1,4,14,24,34,58],
+    [1,1,1,1,1,2,12,22,32,56],
+    [1,1,1,1,1,1,10,20,30,54],
+];
+
+// Магические уровни
+const MAG_LEVELS_PROF2 = [76,76,76, 77,77,77, 78,78,78, 79,79,79, 80,80,80, 81,81,81, 82,82,82, 83,83,83, 84,84,84, 85,85,85];
+const MAG_LEVELS_PROF3 = [81,81,81, 82,82,82, 83,83,83, 84,84,84, 85,85,85];
+
+// Стоимость за попытку [adena, sp] — из EnchantSkillGroups.xml
+// Group 1: 2nd prof — buffs, debuffs, toggles, summons
+const COSTS_G1 = [
+    [74250,575980],[74250,575980],[74250,575980],
+    [112050,604535],[112050,604535],[112050,604535],
+    [150300,634020],[150300,634020],[150300,634020],
+    [189000,680020],[189000,680020],[189000,680020],
+    [228150,711890],[228150,711890],[228150,711890],
+    [267750,761540],[267750,761540],[267750,761540],
+    [307800,795890],[307800,795890],[307800,795890],
+    [348300,849330],[348300,849330],[348300,849330],
+    [389250,886255],[389250,886255],[389250,886255],
+    [430650,943620],[430650,943620],[430650,943620],
+];
+
+// Group 2: 2nd prof — attack skills, cubics
+const COSTS_G2 = [
+    [133650,1036764],[133650,1036764],[133650,1036764],
+    [201690,1088163],[201690,1088163],[201690,1088163],
+    [270540,1141236],[270540,1141236],[270540,1141236],
+    [340200,1224036],[340200,1224036],[340200,1224036],
+    [410670,1281402],[410670,1281402],[410670,1281402],
+    [481950,1370772],[481950,1370772],[481950,1370772],
+    [554040,1432602],[554040,1432602],[554040,1432602],
+    [626940,1528794],[626940,1528794],[626940,1528794],
+    [700650,1595259],[700650,1595259],[700650,1595259],
+    [775170,1698516],[775170,1698516],[775170,1698516],
+];
+
+// Group 5/6: 3rd prof — all types (same costs)
+const COSTS_G5 = [
+    [481950,1370772],[481950,1370772],[481950,1370772],
+    [554040,1432602],[554040,1432602],[554040,1432602],
+    [626940,1528794],[626940,1528794],[626940,1528794],
+    [700650,1595259],[700650,1595259],[700650,1595259],
+    [775170,1698516],[775170,1698516],[775170,1698516],
+];
+
+const GROUP_MAP = { g1: COSTS_G1, g2: COSTS_G2, g5: COSTS_G5 };
+
+// ======= Утилиты =======
+function parseNum(s) { return parseInt(String(s).replace(/[^0-9]/g,''),10)||0; }
+function fmtNum(n) { return Math.round(n).toLocaleString('ru-RU'); }
+function fmtShort(n) {
+    if (n>=1e12) return (n/1e12).toFixed(1)+' трлн';
+    if (n>=1e9) return (n/1e9).toFixed(1)+' млрд';
+    if (n>=1e6) return (n/1e6).toFixed(1)+' кк';
+    if (n>=1e3) return (n/1e3).toFixed(0)+'к';
+    return Math.round(n).toString();
+}
+function chanceClass(v) {
+    if (v>=60) return 'chance-high';
+    if (v>=20) return 'chance-mid';
+    return 'chance-low';
+}
+function autoFormat(inp) { const v=parseNum(inp.value); if(v>0) inp.value=fmtNum(v); }
+
+// ======= Получение параметров =======
+function getParams() {
+    const charLevel = parseInt(document.getElementById('charLevel').value);
+    const groupId = document.getElementById('skillGroup').value;
+    const colIdx = charLevel - 76;
+    const isProf3 = groupId === 'g5';
+    const chances = isProf3 ? CHANCES_PROF3 : CHANCES_PROF2;
+    const magLevels = isProf3 ? MAG_LEVELS_PROF3 : MAG_LEVELS_PROF2;
+    const costs = GROUP_MAP[groupId];
+    const codexPrice = parseNum(document.getElementById('priceCodex').value);
+    const masteryPrice = parseNum(document.getElementById('priceMastery').value);
+    return { charLevel, groupId, colIdx, chances, magLevels, costs, codexPrice, masteryPrice, isProf3 };
+}
+
+// ======= Справочная таблица шансов =======
+function buildRefTable() {
+    const { charLevel, colIdx, chances, magLevels, isProf3 } = getParams();
+    const headRow = document.getElementById('refHead');
+    headRow.innerHTML = '<th>Ур.</th><th>Маг.ур.</th>';
+    CHAR_LEVELS.forEach((lvl,i) => {
+        headRow.innerHTML += `<th class="${i===colIdx?'col-highlight':''}">Ур.${lvl}</th>`;
+    });
+    const tbody = document.getElementById('refBody');
+    tbody.innerHTML = '';
+    chances.forEach((row,idx) => {
+        const tr = document.createElement('tr');
+        let html = `<td><strong>+${idx+1}</strong></td><td class="magic-lvl">${magLevels[idx]}</td>`;
+        for (let i=0;i<10;i++) {
+            const v = row[i];
+            const sel = i===colIdx;
+            html += `<td class="${sel?'col-highlight':'col-dim'} ${sel?chanceClass(v):''}">${v}%</td>`;
+        }
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('chanceInfo').innerHTML = `<div class="info-badge">
+        Персонаж: <strong>ур.${charLevel}</strong> · ${isProf3?'3-я':'2-я'} профа · Заточка до: <strong>+${chances.length}</strong>
+    </div>`;
+}
+
+// ======= Таблица стоимости попыток =======
+function buildAttemptTable() {
+    const { costs, codexPrice, masteryPrice, isProf3, groupId } = getParams();
+    const tbody = document.getElementById('attemptBody');
+    tbody.innerHTML = '';
+    const groupNames = { g1:'баффы/дебаффы/тоглы', g2:'атакующие/кубики', g5:'3-я профа' };
+    costs.forEach((c,i) => {
+        const adena = c[0];
+        const sp = c[1];
+        const regTotal = (i===0 ? codexPrice+adena : adena);
+        const masTotal = masteryPrice + adena;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>+${i+1}</strong></td>
+            <td>${fmtNum(adena)}</td>
+            <td class="dim">${fmtNum(sp)}</td>
+            <td class="cost-regular" title="${i===0 ? 'Codex '+fmtNum(codexPrice)+' + адена '+fmtNum(adena) : 'Только адена (кодекс не нужен)'}">${fmtNum(regTotal)}</td>
+            <td class="cost-master" title="Mastery ${fmtNum(masteryPrice)} + адена ${fmtNum(adena)}">${fmtNum(masTotal)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('attemptInfo').innerHTML = `<div class="info-badge">
+        Тип: <strong>${groupNames[groupId]}</strong> ·
+        Codex: <strong>${fmtNum(codexPrice)}</strong> (1 раз) ·
+        Mastery: <strong>${fmtNum(masteryPrice)}</strong> (каждая попытка)
+    </div>`;
+}
+
+// ======= Расчёт оптимальной стратегии =======
+function recalculate() {
+    const { charLevel, colIdx, chances, costs, codexPrice, masteryPrice } = getParams();
+    const tbody = document.getElementById('costBody');
+    tbody.innerHTML = '';
+
+    let eOpt = 0; // E_opt(n-1) — оптимальная стоимость до текущего уровня
+    let switchLevel = null;
+
+    chances.forEach((row, i) => {
+        const p = row[colIdx] / 100;
+        const chance = row[colIdx];
+        const adena = costs[i][0];
+
+        // Стоимость одной попытки
+        const cReg = (i === 0) ? (codexPrice + adena) : adena;
+        const cMas = masteryPrice + adena;
+
+        const prevEOpt = eOpt;
+
+        // Стоимость шага (маржинальная стоимость перехода +(n-1) → +n)
+        // Обычная: S = C/p + E_opt(n-1)*(1-p)/p  (включает «цену риска» потери прогресса)
+        const stepReg = cReg / p + prevEOpt * (1 - p) / p;
+        // Мастери: S = C_m/p  (нет риска, простой расчёт)
+        const stepMas = cMas / p;
+
+        const useReg = stepReg <= stepMas;
+        const stepOpt = Math.min(stepReg, stepMas);
+        eOpt = prevEOpt + stepOpt;
+
+        if (!useReg && switchLevel === null) {
+            switchLevel = i + 1;
+        }
+
+        // Тултипы с формулой
+        const tipReg = [
+            `Стоимость шага +${i} → +${i+1} обычной:`,
+            `S = C/p + E_opt(+${i}) · (1−p) / p`,
+            `= ${fmtNum(cReg)} / ${(p).toFixed(2)} + ${fmtNum(prevEOpt)} · ${(1-p).toFixed(2)} / ${(p).toFixed(2)}`,
+            `= ${fmtNum(cReg/p)} + ${fmtNum(prevEOpt*(1-p)/p)}`,
+            `= ${fmtNum(stepReg)}`,
+            ``,
+            i===0 ? `C = codex ${fmtNum(codexPrice)} + адена ${fmtNum(adena)}` : `C = адена ${fmtNum(adena)}`,
+            `«Цена риска» = ${fmtNum(prevEOpt*(1-p)/p)} (стоимость потери прогресса при фейле)`,
+        ].join('\n');
+
+        const tipMas = [
+            `Стоимость шага +${i} → +${i+1} мастери:`,
+            `S = C_m / p`,
+            `= ${fmtNum(cMas)} / ${(p).toFixed(2)}`,
+            `= ${fmtNum(stepMas)}`,
+            ``,
+            `C_m = mastery ${fmtNum(masteryPrice)} + адена ${fmtNum(adena)}`,
+            `Без риска: при фейле уровень не падает.`,
+        ].join('\n');
+
+        const tipOpt = [
+            `E_opt(+${i+1}) = E_opt(+${i}) + min(S_обычн, S_мастери)`,
+            `= ${fmtNum(prevEOpt)} + min(${fmtNum(stepReg)}, ${fmtNum(stepMas)})`,
+            `= ${fmtNum(prevEOpt)} + ${fmtNum(stepOpt)}`,
+            `= ${fmtNum(eOpt)}`,
+            ``,
+            `Выбрано: ${useReg ? 'ОБЫЧНАЯ (дешевле на '+fmtNum(stepMas-stepReg)+')' : 'МАСТЕРИ (дешевле на '+fmtNum(stepReg-stepMas)+')'}`,
+        ].join('\n');
+
+        const tr = document.createElement('tr');
+        if (!useReg && switchLevel === i + 1) tr.className = 'switch-row';
+        tr.innerHTML = `
+            <td><strong>+${i+1}</strong></td>
+            <td class="${chanceClass(chance)}">${chance}%</td>
+            <td class="cost-regular has-tip ${useReg?'':'dim'}" title="${tipReg}">${fmtShort(stepReg)}</td>
+            <td class="cost-master has-tip ${useReg?'dim':''}" title="${tipMas}">${fmtShort(stepMas)}</td>
+            <td class="winner-cell ${useReg?'winner-regular':'winner-master'}">${useReg?'Обычная':'Мастери'}</td>
+            <td class="has-tip" title="${tipOpt}"><strong>${fmtShort(eOpt)}</strong></td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('costInfo').innerHTML = `<div class="info-badge">
+        Персонаж: <strong>ур.${charLevel}</strong> ·
+        Codex: <strong>${fmtShort(codexPrice)}</strong> (1 раз на 0→+1) ·
+        Mastery: <strong>${fmtShort(masteryPrice)}</strong> (каждая попытка)
+    </div>`;
+
+    document.getElementById('switchPoint').innerHTML = switchLevel
+        ? `<div class="switch-banner">Точка переключения: начиная с <strong>+${switchLevel}</strong> выгоднее использовать мастери книги.
+           До +${switchLevel - 1} включительно — обычные.</div>`
+        : `<div class="switch-banner">При текущих ценах обычные книги выгоднее на всех уровнях.</div>`;
+}
+
+// ======= Обновление =======
+function updateAll() {
+    buildRefTable();
+    buildAttemptTable();
+    recalculate();
+}
+
+// ======= Event listeners =======
+document.getElementById('charLevel').addEventListener('change', updateAll);
+document.getElementById('skillGroup').addEventListener('change', updateAll);
+document.getElementById('recalc').addEventListener('click', updateAll);
+document.querySelectorAll('#priceCodex, #priceMastery').forEach(inp => {
+    inp.addEventListener('blur', () => autoFormat(inp));
+});
+document.addEventListener('keydown', e => { if (e.key==='Enter') updateAll(); });
+
+// Init
+updateAll();
+</script>
+</body>
+</html>

@@ -207,6 +207,11 @@
             <span class="hint">Считать стоимость начиная с этого уровня</span>
         </div>
         <div class="field">
+            <label>Целевой уровень заточки</label>
+            <select id="targetLevel"></select>
+            <span class="hint">Считать стоимость до этого уровня</span>
+        </div>
+        <div class="field">
             <label>Giant's Codex — обычная книга (адена)</label>
             <input type="text" id="priceCodex" value="9 000 000" inputmode="numeric">
             <span class="hint">Используется 1 раз при заточке 0 → +1</span>
@@ -436,21 +441,49 @@ function chanceClass(v) {
 }
 function autoFormat(inp) { const v=parseNum(inp.value); if(v>0) inp.value=fmtNum(v); }
 
-// ======= Начальный уровень =======
-function updateStartLevelOptions() {
+// ======= Уровни заточки =======
+const _savedTargetLevel = { prof2: null, prof3: null };
+
+function updateLevelOptions() {
     const groupId = document.getElementById('skillGroup').value;
     const isProf3 = groupId === 'g5';
-    const maxLevel = isProf3 ? 14 : 29;
-    const sel = document.getElementById('startLevel');
-    const curVal = parseInt(sel.value) || 0;
-    sel.innerHTML = '';
-    for (let i = 0; i <= maxLevel; i++) {
+    const maxLevel = isProf3 ? 15 : 30;
+
+    const selStart = document.getElementById('startLevel');
+    const curStart = parseInt(selStart.value) || 0;
+    selStart.innerHTML = '';
+    for (let i = 0; i <= maxLevel - 1; i++) {
         const opt = document.createElement('option');
         opt.value = i;
         opt.textContent = i === 0 ? '0 (с нуля)' : '+' + i;
-        sel.appendChild(opt);
+        selStart.appendChild(opt);
     }
-    sel.value = Math.min(curVal, maxLevel);
+    selStart.value = Math.min(curStart, maxLevel - 1);
+
+    const selTarget = document.getElementById('targetLevel');
+    // Сохраняем текущее значение для предыдущей профы
+    const prevVal = parseInt(selTarget.value);
+    if (prevVal > 0 && selTarget.options.length > 0) {
+        const prevMax = parseInt(selTarget.options[selTarget.options.length - 1].value);
+        if (prevMax === 30) _savedTargetLevel.prof2 = prevVal;
+        else if (prevMax === 15) _savedTargetLevel.prof3 = prevVal;
+    }
+
+    selTarget.innerHTML = '';
+    for (let i = 1; i <= maxLevel; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = '+' + i;
+        selTarget.appendChild(opt);
+    }
+
+    // Восстанавливаем запомненное значение для текущей профы
+    const saved = isProf3 ? _savedTargetLevel.prof3 : _savedTargetLevel.prof2;
+    if (saved !== null && saved >= 1 && saved <= maxLevel) {
+        selTarget.value = saved;
+    } else {
+        selTarget.value = maxLevel;
+    }
 }
 
 // ======= Получение параметров =======
@@ -465,12 +498,15 @@ function getParams() {
     const codexPrice = parseNum(document.getElementById('priceCodex').value);
     const masteryPrice = parseNum(document.getElementById('priceMastery').value);
     const startLevel = parseInt(document.getElementById('startLevel').value) || 0;
-    return { charLevel, groupId, colIdx, chances, magLevels, costs, codexPrice, masteryPrice, isProf3, startLevel };
+    let targetLevel = parseInt(document.getElementById('targetLevel').value) || chances.length;
+    targetLevel = Math.min(targetLevel, chances.length);
+    if (targetLevel <= startLevel) targetLevel = chances.length;
+    return { charLevel, groupId, colIdx, chances, magLevels, costs, codexPrice, masteryPrice, isProf3, startLevel, targetLevel };
 }
 
 // ======= Справочная таблица шансов =======
 function buildRefTable() {
-    const { charLevel, colIdx, chances, magLevels, isProf3 } = getParams();
+    const { charLevel, colIdx, chances, magLevels, isProf3, targetLevel } = getParams();
     const isMobile = window.innerWidth <= 600;
     const headRow = document.getElementById('refHead');
     headRow.innerHTML = '<th>Ур.</th><th>Маг.ур.</th>';
@@ -485,6 +521,7 @@ function buildRefTable() {
     tbody.innerHTML = '';
     chances.forEach((row,idx) => {
         const tr = document.createElement('tr');
+        if (idx + 1 > targetLevel) tr.className = 'row-dim';
         let html = `<td><strong>+${idx+1}</strong></td><td class="magic-lvl">${magLevels[idx]}</td>`;
         if (isMobile) {
             const v = row[colIdx];
@@ -500,7 +537,7 @@ function buildRefTable() {
         tbody.appendChild(tr);
     });
     document.getElementById('chanceInfo').innerHTML = `<div class="info-badge">
-        Персонаж: <strong>ур.${charLevel}</strong> · ${isProf3?'3-я':'2-я'} профа · Заточка до: <strong>+${chances.length}</strong>
+        Персонаж: <strong>ур.${charLevel}</strong> · ${isProf3?'3-я':'2-я'} профа · Заточка до: <strong>+${targetLevel}</strong>
     </div>`;
 }
 
@@ -537,13 +574,17 @@ function buildAttemptTable() {
 
 // ======= Расчёт оптимальной стратегии =======
 function recalculate() {
-    const { charLevel, colIdx, chances, costs, codexPrice, masteryPrice, startLevel } = getParams();
+    const { charLevel, colIdx, chances, costs, codexPrice, masteryPrice, startLevel, targetLevel } = getParams();
     const tbody = document.getElementById('costBody');
     tbody.innerHTML = '';
 
     let eOpt = 0; // E_opt(n-1) — оптимальная стоимость до текущего уровня
     let eOptAtStart = 0;
+    let eOptAtTarget = 0;
     let switchLevel = null;
+    let bCodex = 0, bMastery = 0;
+    let bCodexAtStart = 0, bMasteryAtStart = 0;
+    let bCodexAtTarget = 0, bMasteryAtTarget = 0;
 
     chances.forEach((row, i) => {
         const p = row[colIdx] / 100;
@@ -567,13 +608,33 @@ function recalculate() {
         const stepOpt = Math.min(stepReg, stepMas);
         eOpt = prevEOpt + stepOpt;
 
-        if (i + 1 === startLevel) eOptAtStart = eOpt;
+        // Ожидаемое количество книг
+        if (useReg) {
+            bCodex = (bCodex + (i === 0 ? 1 : 0)) / p;
+            bMastery = bMastery / p;
+        } else {
+            // bCodex остаётся прежним
+            bMastery = bMastery + 1 / p;
+        }
+
+        if (i + 1 === startLevel) {
+            eOptAtStart = eOpt;
+            bCodexAtStart = bCodex;
+            bMasteryAtStart = bMastery;
+        }
+
+        if (i + 1 === targetLevel) {
+            eOptAtTarget = eOpt;
+            bCodexAtTarget = bCodex;
+            bMasteryAtTarget = bMastery;
+        }
 
         if (!useReg && switchLevel === null) {
             switchLevel = i + 1;
         }
 
-        const isDim = (i + 1) <= startLevel;
+        const isDimBefore = (i + 1) <= startLevel;
+        const isDimAfter = (i + 1) > targetLevel;
         const delta = eOpt - eOptAtStart;
 
         // Тултипы с формулой
@@ -601,7 +662,7 @@ function recalculate() {
             `При фейле уровень не падает — риска потери нет.`,
         ].join('\n');
 
-        const tipOpt = isDim ? [
+        const tipOpt = isDimBefore ? [
             `Оптимальная стоимость 0 → +${i+1}`,
             ``,
             `Уже вложено (0 → +${i}): ${fmtNum(prevEOpt)}`,
@@ -617,10 +678,10 @@ function recalculate() {
             `Шаг +${i} → +${i+1}: ${fmtNum(stepOpt)} (${useReg ? 'обычная' : 'мастери'})`,
         ].filter(Boolean).join('\n');
 
-        const totalDisplay = isDim ? fmtShort(eOpt) : fmtShort(delta);
+        const totalDisplay = isDimBefore ? fmtShort(eOpt) : fmtShort(delta);
 
         const tr = document.createElement('tr');
-        if (isDim) {
+        if (isDimBefore || isDimAfter) {
             tr.className = 'row-dim';
         } else if (!useReg && switchLevel === i + 1) {
             tr.className = 'switch-row';
@@ -645,13 +706,16 @@ function recalculate() {
     }
 
 
-    const totalCost = eOpt - eOptAtStart;
+    const totalCost = eOptAtTarget - eOptAtStart;
     const fromLabel = startLevel > 0 ? `от +${startLevel} ` : '';
+    const needCodex = Math.ceil(bCodexAtTarget - bCodexAtStart);
+    const needMastery = Math.ceil(bMasteryAtTarget - bMasteryAtStart);
+    const booksLine = `Книги: Codex ×${needCodex}, Mastery ×${needMastery}`;
     document.getElementById('switchPoint').innerHTML = switchLevel
         ? `<div class="switch-banner">Точка переключения: начиная с <strong>+${switchLevel}</strong> выгоднее мастери.
-           Стоимость ${fromLabel}до +${chances.length}: <strong>${fmtShort(totalCost)}</strong></div>`
+           Стоимость ${fromLabel}до +${targetLevel}: <strong>${fmtShort(totalCost)}</strong><br>${booksLine}</div>`
         : `<div class="switch-banner">При текущих ценах обычные книги выгоднее на всех уровнях.
-           Стоимость ${fromLabel}до +${chances.length}: <strong>${fmtShort(totalCost)}</strong></div>`;
+           Стоимость ${fromLabel}до +${targetLevel}: <strong>${fmtShort(totalCost)}</strong><br>${booksLine}</div>`;
 }
 
 // ======= URL-шаринг =======
@@ -662,6 +726,7 @@ function updateURL() {
     params.set('codex', parseNum(document.getElementById('priceCodex').value));
     params.set('mastery', parseNum(document.getElementById('priceMastery').value));
     params.set('from', document.getElementById('startLevel').value);
+    params.set('to', document.getElementById('targetLevel').value);
     history.replaceState(null, '', '?' + params.toString());
 }
 
@@ -688,6 +753,7 @@ function saveSettings() {
         priceCodex: document.getElementById('priceCodex').value,
         priceMastery: document.getElementById('priceMastery').value,
         startLevel: document.getElementById('startLevel').value,
+        targetLevel: document.getElementById('targetLevel').value,
     };
     try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
@@ -712,10 +778,11 @@ function onSettingsChange() {
 
 document.getElementById('charLevel').addEventListener('change', onSettingsChange);
 document.getElementById('skillGroup').addEventListener('change', () => {
-    updateStartLevelOptions();
+    updateLevelOptions();
     onSettingsChange();
 });
 document.getElementById('startLevel').addEventListener('change', onSettingsChange);
+document.getElementById('targetLevel').addEventListener('change', onSettingsChange);
 document.querySelectorAll('#priceCodex, #priceMastery').forEach(inp => {
     inp.addEventListener('input', () => { updateAll(); });
     inp.addEventListener('blur', () => { autoFormat(inp); saveSettings(); updateURL(); });
@@ -756,7 +823,7 @@ if (hasURLParams) {
     loadSettings();
 }
 
-updateStartLevelOptions();
+updateLevelOptions();
 
 if (hasURLParams && urlParams.has('from')) {
     document.getElementById('startLevel').value = urlParams.get('from');
@@ -766,6 +833,18 @@ if (hasURLParams && urlParams.has('from')) {
         if (raw) {
             const data = JSON.parse(raw);
             if (data.startLevel !== undefined) document.getElementById('startLevel').value = data.startLevel;
+        }
+    } catch(e) {}
+}
+
+if (hasURLParams && urlParams.has('to')) {
+    document.getElementById('targetLevel').value = urlParams.get('to');
+} else if (!hasURLParams) {
+    try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+            const data = JSON.parse(raw);
+            if (data.targetLevel !== undefined) document.getElementById('targetLevel').value = data.targetLevel;
         }
     } catch(e) {}
 }
